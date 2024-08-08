@@ -15,6 +15,16 @@ import (
 	"time"
 )
 
+// An Error represents an error response from an NNTP server.
+type Error struct {
+	Code uint
+	Msg  string
+}
+
+// A ProtocolError represents responses from an NNTP server
+// that seem incorrect for NNTP.
+type ProtocolError string
+
 // Conn represents a connection to an NNTP server.
 type Conn struct {
 	conn       io.ReadWriteCloser
@@ -216,7 +226,11 @@ func DialWithContext(ctx context.Context, network, addr string) (*Conn, error) {
 }
 
 // DialTLSWithContext connects to an NNTP server using TLS with context support.
-func DialTLSWithContext(ctx context.Context, network, addr string, config *tls.Config) (*Conn, error) {
+func DialTLSWithContext(
+	ctx context.Context,
+	network, addr string,
+	config *tls.Config,
+) (*Conn, error) {
 	dialer := net.Dialer{}
 	conn, err := tls.DialWithDialer(&dialer, network, addr, config)
 	if err != nil {
@@ -266,6 +280,21 @@ func (c *Conn) Authenticate(username, password string) error {
 		_, _, err = c.cmd(2, "AUTHINFO PASS %s", password)
 	}
 	return err
+}
+
+func (p ProtocolError) Error() string {
+	return string(p)
+}
+
+func (e Error) Error() string {
+	return fmt.Sprintf("%03d %s", e.Code, e.Msg)
+}
+
+func maybeId(cmd, id string) string {
+	if len(id) > 0 {
+		return cmd + " " + id
+	}
+	return cmd
 }
 
 // nextLastStat performs the work for NEXT, LAST, and STAT.
