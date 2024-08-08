@@ -268,6 +268,37 @@ func (c *Conn) Authenticate(username, password string) error {
 	return err
 }
 
+// nextLastStat performs the work for NEXT, LAST, and STAT.
+func (c *Conn) nextLastStat(cmd, id string) (string, string, error) {
+	_, line, err := c.cmd(223, maybeId(cmd, id))
+	if err != nil {
+		return "", "", err
+	}
+	ss := strings.SplitN(line, " ", 3) // optional comment ignored
+	if len(ss) < 2 {
+		return "", "", ProtocolError("Bad response to " + cmd + ": " + line)
+	}
+	return ss[0], ss[1], nil
+}
+
+// Stat looks up the message with the given id and returns its
+// message number in the current group, and vice versa.
+// The returned message number can be "0" if the current group
+// isn't one of the groups the message was posted to.
+func (c *Conn) Stat(id string) (number, msgid string, err error) {
+	return c.nextLastStat("STAT", id)
+}
+
+// Last selects the previous article, returning its message number and id.
+func (c *Conn) Last() (number, msgid string, err error) {
+	return c.nextLastStat("LAST", "")
+}
+
+// Next selects the next article, returning its message number and id.
+func (c *Conn) Next() (number, msgid string, err error) {
+	return c.nextLastStat("NEXT", "")
+}
+
 // Post posts an article to the server.
 func (c *Conn) Post(a *Article) error {
 	return c.RawPost(&articleReader{a: a})
